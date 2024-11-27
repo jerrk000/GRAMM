@@ -274,6 +274,72 @@ namespace GRAMM_2001
                     Environment.Exit(0);
                 }
 
+                //--------------------------------------------------------------------Start of Code for BSC Kühberger---------------------------------------------------------------------
+                string initmonitor_file = "initmonitor.txt";
+                if (File.Exists(initmonitor_file) == true)
+                {
+                    try
+                    {
+                        using (FileStream fs = new FileStream(initmonitor_file, FileMode.Open, FileAccess.Read, FileShare.Read))
+                        {
+                            using (StreamReader myreader = new StreamReader(fs))
+                            {
+                                //read in first line consisting of amount of measurement points
+                                string[] initmonitor_first_row = myreader.ReadLine().Split(new char[] { ' ', ';', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                                Int32 amount_measurements = Convert.ToInt32(initmonitor_first_row[0]);
+
+                                //read in second line consisting of individual anemoheights
+                                string[] initmonitor_second_row = myreader.ReadLine().Split(new char[] { ' ', ';', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                                Int32[] ZANEMO = Array.ConvertAll(initmonitor_second_row, Convert.ToInt32);
+                                foreach (Int32 anemo in ZANEMO)
+                                {
+                                    Console.WriteLine("ZANEMO: " + anemo);
+                                }
+
+                                //Skip line with names of measurement points and column descriptions TODO handle this correctly
+                                string[] headers = myreader.ReadLine().Split(new char[] { ' ', ';', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+                                //Get first row of measurements and partition it in different lists
+                                double[] ZWINDGE = new double[amount_measurements];
+                                Int32[] ZWINDDIR   = new int[amount_measurements];      
+                                Int32[] ZAKLA      = new int[amount_measurements];     
+                                
+                                string[] initmonitor_first_measurement = myreader.ReadLine().Split(new char[] { ' ', ';', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                                if ((initmonitor_first_measurement.Length/3) != amount_measurements) 
+                                {
+                                    Console.WriteLine("Error when comparing row length with amount of measurements in " + initmonitor_file + " - Execution stopped");
+                                    Environment.Exit(0);
+                                }
+                                for (int i = 0; i < amount_measurements; i++)
+                                {
+                                    ZWINDGE[i] = Convert.ToDouble(initmonitor_first_measurement[i*3].Replace(".", Program.decsep));
+                                    ZWINDDIR[i] = Convert.ToInt32(initmonitor_first_measurement[(i*3)+1]);
+                                    ZAKLA[i] = Convert.ToInt32(initmonitor_first_measurement[(i*3) + 2]);
+                                    Console.WriteLine("First Measurement: " + ZWINDGE[i] + " " + ZWINDDIR[i] + " " + ZAKLA[i]);
+                                }
+                                //WINDDIR = Convert.ToDouble(text[0].Replace(".", Program.decsep));
+                                //WINDGE = Math.Max(Convert.ToDouble(text[1].Replace(".", Program.decsep)), 0.001);
+                                //Program.AKLA = Convert.ToInt16(text[2]);
+                                //Program.Windspeed_meteopgt = WINDGE;
+
+                                
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        Console.WriteLine("Error when reading file " + initmonitor_file + " - Execution stopped");
+                        Environment.Exit(0);
+                    }
+                }
+                else //maybe comment out this else statement, as this is monitoring with multiple points is just optional
+                {
+                    Console.WriteLine("File " + initmonitor_file + " is missing"); // - Execution stopped");
+                                                                                   //Environment.Exit(0);
+                }
+                //--------------------------------------------------------------------End   of Code for BSC Kühberger---------------------------------------------------------------------
+
+
                 //RANDOM wind direction within 10° Sector width to avoid finger like structures with point sources
                 if (TIMESERIES == 0)
                 {
