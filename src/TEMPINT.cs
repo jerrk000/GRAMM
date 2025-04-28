@@ -12,6 +12,8 @@
 
 using System;
 using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace GRAMM_2001
@@ -103,6 +105,18 @@ namespace GRAMM_2001
             double PUNTEN;
             //double POBEN;
             double PMEER;
+            //--------------------------------------------------------------------Start of Code for BSC Kühberger---------------------------------------------------------------------
+            Int32 amount_measurements = 1;
+            string initmonitor_file = "initmonitor.txt"; //filename used to read in multiple monitoring points.
+                                                         //For it to work, file needs to be in folder "GRAMM\src\bin\Debug\net8.0"
+                                                         //Format of file similar to "meteopgt.all", but with an additional row which defines 
+                                                         // the names of data points used for initialisation
+                                                         // TODO: add a explanation how the program matches the names in the file to the correct,
+                                                         //       already saved monitoring points (and their respective variables)
+            double[] ZWINDGE = null;    //Array for "Windgeschwindigkeit"
+            Int32[] ZWINDDIR = null;    //Array for "Winddirection"
+            Int32[] ZAKLA = null;       //Array for "Ausbreitungsklasse"
+            //--------------------------------------------------------------------End of Code for BSC Kühberger---------------------------------------------------------------------
 
             //increment actual computed flow field situation
             Program.IWETTER++;
@@ -275,9 +289,9 @@ namespace GRAMM_2001
                 }
 
                 //--------------------------------------------------------------------Start of Code for BSC Kühberger---------------------------------------------------------------------
-                string initmonitor_file = "initmonitor.txt";
-                if (File.Exists(initmonitor_file) == true)
+                if (File.Exists(initmonitor_file) == true) //the following code only gets executed if the initmonitor file exists in the folder of the executable
                 {
+                    Console.WriteLine("File: " + initmonitor_file + " exists! Windfield-initialization with multiple monitoring points begins.");
                     try
                     {
                         using (FileStream fs = new FileStream(initmonitor_file, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -286,7 +300,7 @@ namespace GRAMM_2001
                             {
                                 //read in first line consisting of amount of measurement points
                                 string[] initmonitor_first_row = myreader.ReadLine().Split(new char[] { ' ', ';', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                                Int32 amount_measurements = Convert.ToInt32(initmonitor_first_row[0]);
+                                amount_measurements = Convert.ToInt32(initmonitor_first_row[0]);
 
                                 //read in second line consisting of individual anemoheights
                                 string[] initmonitor_second_row = myreader.ReadLine().Split(new char[] { ' ', ';', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
@@ -299,30 +313,44 @@ namespace GRAMM_2001
                                 //Skip line with names of measurement points and column descriptions TODO handle this correctly
                                 string[] headers = myreader.ReadLine().Split(new char[] { ' ', ';', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
 
-                                //Get first row of measurements and partition it in different lists
-                                double[] ZWINDGE = new double[amount_measurements];
-                                Int32[] ZWINDDIR   = new int[amount_measurements];      
-                                Int32[] ZAKLA      = new int[amount_measurements];     
+                                //Count amount of data entries (rows) in initmonitor_file
+                                Int32 amount_of_lines = File.ReadLines(initmonitor_file).Count(line => !string.IsNullOrWhiteSpace(line));
+                                amount_of_lines = amount_of_lines - 3; //because the first 3 rows are not data points, they do not count
                                 
-                                string[] initmonitor_first_measurement = myreader.ReadLine().Split(new char[] { ' ', ';', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                                if ((initmonitor_first_measurement.Length/3) != amount_measurements) 
-                                {
-                                    Console.WriteLine("Error when comparing row length with amount of measurements in " + initmonitor_file + " - Execution stopped");
-                                    Environment.Exit(0);
-                                }
-                                for (int i = 0; i < amount_measurements; i++)
-                                {
-                                    ZWINDGE[i] = Convert.ToDouble(initmonitor_first_measurement[i*3].Replace(".", Program.decsep));
-                                    ZWINDDIR[i] = Convert.ToInt32(initmonitor_first_measurement[(i*3)+1]);
-                                    ZAKLA[i] = Convert.ToInt32(initmonitor_first_measurement[(i*3) + 2]);
-                                    Console.WriteLine("First Measurement: " + ZWINDGE[i] + " " + ZWINDDIR[i] + " " + ZAKLA[i]);
-                                }
-                                //WINDDIR = Convert.ToDouble(text[0].Replace(".", Program.decsep));
-                                //WINDGE = Math.Max(Convert.ToDouble(text[1].Replace(".", Program.decsep)), 0.001);
-                                //Program.AKLA = Convert.ToInt16(text[2]);
-                                //Program.Windspeed_meteopgt = WINDGE;
 
-                                
+                                //Get first row of measurements and partition it in different lists
+                                //TODO: currently only first row of values, but should be all values of list. 2 possibilities:
+                                //          1. List of list, so each sub-list represents one monitoring point
+                                //          2. One big list, where you have to keep track where each data entry for each monitoring point is located.
+                                ZWINDGE     = new double[amount_measurements * amount_of_lines];
+                                ZWINDDIR    = new int[amount_measurements * amount_of_lines];      
+                                ZAKLA       = new int[amount_measurements * amount_of_lines];
+
+
+                                for (int line = 0; line < amount_of_lines; line++)
+                                {
+                                    string[] initmonitor_measurement = myreader.ReadLine().Split(new char[] { ' ', ';', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                                    if ((initmonitor_measurement.Length / 3) != amount_measurements)
+                                    {
+                                        Console.WriteLine("Error when comparing row length with amount of measurements in " + initmonitor_file + " - Execution stopped");
+                                        Environment.Exit(0);
+                                    }
+                                    for (int i = 0; i < amount_measurements; i++)
+                                    {
+                                        ZWINDGE[(line * amount_measurements) + i]  = Convert.ToDouble(initmonitor_measurement[i * 3].Replace(".", Program.decsep));
+                                        ZWINDDIR[(line * amount_measurements) + i] = Convert.ToInt32(initmonitor_measurement[(i * 3) + 1]);
+                                        ZAKLA[(line * amount_measurements) + i]    = Convert.ToInt32(initmonitor_measurement[(i * 3) + 2]);
+                                    }
+                                }
+                                //Loop over list to compare if everything got read in correctly. Looks right! but can be commented out
+                                for (int line = 0; line < amount_of_lines; line++)
+                                {
+                                    for (int i = 0; i < amount_measurements; i++)
+                                    {
+                                    
+                                        Console.WriteLine("Row: " + line + ", Datapoint: " + i + ", WINDGE: " + ZWINDGE[(line * amount_measurements) + i] + " WINDDIR: " + ZWINDDIR[(line * amount_measurements) + i] + " AKLA: " + ZAKLA[(line * amount_measurements) + i]);
+                                    }
+                                }
                             }
                         }
                     }
@@ -1548,6 +1576,48 @@ namespace GRAMM_2001
                         }
                     }
                 });
+                //--------------------------------------------------------------------Start of Code for BSC Kühberger---------------------------------------------------------------------
+                //Weighing windspeed of multiple monitorpoints for each grid point
+                if (File.Exists(initmonitor_file) == true)
+                {
+                    for (int i = 1; i <= NI; i++)
+                    {
+                        for (int j = 1; j <= NJ; j++)
+                        {
+                            for (int k = 1; k <= NK; k++) //TODO is this loop needed?
+                            {
+                                float[] dXM = new float[amount_measurements];
+                                float[] dYM = new float[amount_measurements];
+                                float[] dRM = new float[amount_measurements];
+                                float[] WGTR = new float[amount_measurements];
+
+
+                                for (int monitorpoint = 1; monitorpoint <= amount_measurements; monitorpoint++) //Bestimme Abstand zwischen Monitorlage und aktueller Koordinate
+                                {
+                                    dXM[monitorpoint] = (float)Xrec[monitorpoint] - (IKOOA + ((float)i - 1) * DDX[0]); //TODO check how I can get correct Xrec for each receptor point, because list saves it in a specific order
+                                                                                                      //TODO what is DX exactly? I found DDX, but this is "horizontal grid size in x-direction", array with different values?
+                                    dYM[monitorpoint] = (float)Yrec[monitorpoint] - (JKOOA + ((float)j - 1) * DDY[0]); //TODO DDX[0] and DDY[0] change, DX or DY?
+
+                                    dRM[monitorpoint] = (float)Math.Pow(dXM[monitorpoint] * dXM[monitorpoint] + dXM[monitorpoint] * dXM[monitorpoint], 0.5);
+                                }
+                                float SUMR = 0;
+                                for (int monitorpoint = 1; monitorpoint <= amount_measurements; monitorpoint++) //Start Ermittlung Gewicht für jeden Monitorpunkt in Bezug auf I,J
+                                {
+                                    SUMR = SUMR + 1 / Math.Max(dRM[monitorpoint], 1);
+                                }
+                                for (int monitorpoint = 1; monitorpoint <= amount_measurements; monitorpoint++)
+                                {
+                                    WGTR[monitorpoint] = (1 / dRM[monitorpoint]) / SUMR;
+                                }
+                                for (int monitorpoint = 1; monitorpoint <= amount_measurements; monitorpoint++) //Start Ermittlung Gewicht für jeden Monitorpunkt in Bezug auf I,J
+                                {
+                                    Program.U[i][j][k] = Program.U[i][j][k] + ZWINDGE[monitorpoint] * WGTR[monitorpoint]; //TODO zuerst auf 0 setzen, oder hat das dann auch mehrere Iterationen?
+                                }
+                            }
+                        }
+                    }
+                }
+                //--------------------------------------------------------------------End   of Code for BSC Kühberger---------------------------------------------------------------------
                 //check if each cell is assigned a temperature
                 M = 0;
                 O = 0;
